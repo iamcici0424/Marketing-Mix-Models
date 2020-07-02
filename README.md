@@ -6,3 +6,7 @@ The ultimate goal of any marketing activities is to increase sales, either in sh
 Among diverse marketing activities, advertising is a major mean for branding and informing. Both online (emails, social media, displays, etc.) and offline (direct mails) advertisements play an indispensable role in marketing. As placing ads is expensive in terms of the cost of time, recourses, and budget, one most frequently asked question from the management team is that: how does my advertising work? With this question in mind, our team leveraged four methods to tackle the advertising effectiveness measurement problem: **last-click attribution analysis, holdout testing (experimentation), marketing mix models and model-based attribution analysis.** 
 
 The main goal of this project is to evaluate the **effectiveness of different advertising channels** from four different perspectives from *500,000+* data. Meanwhile, we would learn from the advantages and disadvantages of the approaches and gain a more comprehensive understanding of mix modeling methods for continuous study.
+
+# Data
+
+# Code
