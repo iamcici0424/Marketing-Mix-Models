@@ -1,5 +1,4 @@
-# Marketing-Mix-Models
-Advertising Response Measurement
+# Marketing Mix Models：Advertising Response Measurement
 
 The ultimate goal of any marketing activities is to increase sales, either in short-term or long-term, and ideally each campaign or marketing channel should be evaluated based on the incremental profit, which is the additional sales we produce with advertising over what we would have sold without advertising, relative to its cost. By analyzing the correlations between marketing activities and the transactions, weakness and strengths of various channels, seasonality of consumer’s response, the marketing team could evaluate the cost efficiency and thus move forward to optimize the resources allocation for marketing spending, and strategically plan marketing events to improve the effectiveness of marketing efforts.
 
