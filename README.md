@@ -11,7 +11,8 @@
 + Zichen(Zoe) Huang zh2380@columbia.edu
 + Jiaying(Claire) Wu jw3644@columbia.edu 
 
-**Goal**: The main goal of this project is to evaluate the `effectiveness of different advertising channels` from four different perspectives from *500,000+* data. Meanwhile, we would learn from the advantages and disadvantages of the approaches and gain a more comprehensive understanding of mix modeling methods for continuous study.
+**Goal**: 
+The main goal of this project is to evaluate the `effectiveness of different advertising channels` from four different perspectives from *500,000+* data. Meanwhile, we would learn from the advantages and disadvantages of the approaches and gain a more comprehensive understanding of mix modeling methods for continuous study.
 
 
 ## Introduction
@@ -30,6 +31,6 @@
 
 ## Code
 
-* [Main Code](2_Final Report_Team_K-2.rmd)
-* [R Shiny App](4_Reporting_Engine_Team_K-2.rmd)
-* [Presentation Slides](6_Presentation_K_final-1.rmd)
+* [Main Code](code/2_Final_Report_Team_K-2.rmd)
+* [R Shiny App](code/4_Reporting_Engine_Team_K-2.rmd)
+* [Presentation Slides](code/6_Presentation_K_final-1.rmd)
