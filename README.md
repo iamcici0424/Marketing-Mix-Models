@@ -24,7 +24,7 @@
 
 ## Data
 
-*
+* [Data Zip](data/1_Data_Team_K-2.zip)
 
 
 
