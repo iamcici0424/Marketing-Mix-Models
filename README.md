@@ -24,8 +24,12 @@
 
 ## Data
 
-* [Data Zip](data/1_Data_Team_K-2.zip)
-
-
+* [Customer Dataset](data/customer.csv)
+* [Impressions](data/impressions.csv)
+* [Transactions](transactions.csv)
 
 ## Code
+
+* [Main Code](2_Final Report_Team_K-2.rmd)
+* [R Shiny App](4_Reporting_Engine_Team_K-2.rmd)
+* [Presentation Slides](6_Presentation_K_final-1.rmd)
