@@ -2,6 +2,15 @@
 
 **Time**: 12/2018 – 05/2019
 
+**Term** : Spring 2019
+
+**Group members**:
+Chen(Cici) Chen cc4291@columbia.edu
+
+Zichen(Zoe) Huang zh2380@columbia.edu
+
+Jiaying(Claire) Wu jw3644@columbia.edu 
+
 **Goal**: The main goal of this project is to evaluate the `effectiveness of different advertising channels` from four different perspectives from *500,000+* data. Meanwhile, we would learn from the advantages and disadvantages of the approaches and gain a more comprehensive understanding of mix modeling methods for continuous study.
 
 
