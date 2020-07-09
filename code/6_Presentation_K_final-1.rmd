@@ -1,0 +1,410 @@
+---
+title: "Advertising Response Measurement"
+author: "Team K"
+date: "4/25/2019"
+output: 
+  slidy_presentation:
+    font_adjustment: -2
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo = TRUE, eval = TRUE, comment="", warning = FALSE, message = FALSE, tidy.opts=list(width.cutoff=55), tidy = TRUE)
+set.seed(123) # ensures repeatable results for attribution rules
+options(scipen=999) # suppress scientific notation
+```
+
+```{r libraries, echo=FALSE}
+library(prettydoc)
+library(data.table)
+library(Hmisc)
+library(scales)
+library(DT)
+library(lubridate)
+```
+
+```{r my_functions, echo=FALSE}
+fit.model <- function(dt, outcome.name, input.names, model.type, digits = 3){
+  the.formula <- reduce.formula(dt = dt, outcome.name = outcome.name, input.names = input.names)
+  
+  if(model.type == "logistic"){
+    mod <- glm(formula = the.formula, family = "binomial", data = dt)
+    mod.summary <- logistic.regression.summary(glm.mod = mod, digits = digits)
+  }
+  if(model.type == "linear"){
+    mod <- lm(formula = the.formula, data = dt)
+    mod.summary <- linear.regression.summary(lm.mod = mod, digits = digits)
+  }
+  mod.summary.rounded <- mod.summary[, lapply(X = .SD, FUN = "round.numerics", digits = digits)]
+  return(mod.summary.rounded)
+}
+
+
+logistic.regression.summary <- function(glm.mod, digits = 3){
+  library(data.table)
+  glm.coefs <- as.data.table(summary(glm.mod)$coefficients, keep.rownames = TRUE)
+  alpha = 0.05
+  z <- qnorm(p = 1-alpha/2, mean = 0, sd = 1)
+  glm.coefs[, Odds.Ratio := exp(Estimate)]
+  glm.coefs[, OR.Lower.95 := exp(Estimate - z * `Std. Error`)]
+  glm.coefs[, OR.Upper.95 := exp(Estimate + z * `Std. Error`)]
+  return(glm.coefs[])
+}
+
+
+linear.regression.summary <- function(lm.mod, digits = 3, alpha = 0.05) {
+  lm.coefs <- as.data.table(summary(lm.mod)$coefficients,keep.rownames = TRUE)
+  setnames(x = lm.coefs, old = "rn", new = "Variable")
+  z <- qnorm(p = 1 - alpha/2, mean = 0, sd = 1)
+  lm.coefs[, Coef.Lower.95 := Estimate - z * `Std. Error`]
+  lm.coefs[, Coef.Upper.95 := Estimate + z * `Std. Error`]
+  return(lm.coefs)
+}
+
+create.formula <- function(outcome.name, input.names, input.patterns = NA, all.data.names = NA, return.as = "character"){
+  
+  variable.names.from.patterns <- c()
+  if(!is.na(input.patterns[1]) & !is.na(all.data.names[1])){
+    pattern <- paste(input.patterns, collapse = "|")
+    variable.names.from.patterns <- all.data.names[grep(pattern = pattern, x = all.data.names)]
+  }
+  all.input.names <- unique(c(input.names, variable.names.from.patterns))
+  all.input.names <- all.input.names[all.input.names != outcome.name]
+  
+  if(!is.na(all.data.names[1])){
+    all.input.names <- all.input.names[all.input.names %in% all.data.names]
+  }
+
+  input.names.delineated <- sprintf("`%s`", all.input.names)
+  the.formula <- sprintf("`%s` ~ %s", outcome.name, paste(input.names.delineated, collapse = "+"))
+  
+  if(return.as == "formula"){
+    return(as.formula(the.formula))
+  }
+  if(return.as != "formula"){
+    return(the.formula)
+  }
+}
+
+reduce.formula <- function(dt, outcome.name, input.names, input.patterns = NA, max.input.categories = 20, max.outcome.categories.to.search = 4, return.as = "formula"){
+  require(data.table)
+  dt <- setDT(dt)
+  
+  if(!(outcome.name %in% names(dt))){
+    return("Error:  outcome.name is not in names(dt).")
+  }
+  
+  pattern.names <- list()
+  if(!is.na(input.patterns[1])){
+    for(i in 1:length(input.patterns)){
+      pattern.names[[i]] <- names(dt)[grep(pattern = input.patterns[i], x = names(dt))]
+    }
+  }
+  all.input.names <- c(input.names, as.character(pattern.names))
+  
+  num.outcome.categories <- dt[!is.na(get(outcome.name)), length(unique(get(outcome.name)))]
+  
+  if(num.outcome.categories <= max.outcome.categories.to.search){
+    num.unique.tab <- dt[, lapply(X = .SD, FUN = function(x){return(length(unique(x[!is.na(x)])))}), .SDcols = input.names, by = outcome.name]
+    min.categories.tab <- num.unique.tab[, lapply(X = .SD, FUN = "min"), .SDcols = input.names]
+    
+    reduced.inputs <- names(min.categories.tab)[min.categories.tab >= 2]
+  }
+  if(num.outcome.categories > max.outcome.categories.to.search){
+    reduced.inputs <- all.input.names
+  }
+  
+  the.formula <- create.formula(outcome.name = outcome.name, input.names = reduced.inputs, all.data.names = names(dt), input.patterns = NA, return.as = return.as)
+  return(the.formula)
+}
+
+round.numerics <- function(x, digits = 0, nearest = 1){
+  if(is.numeric(x)){
+    return(nearest * round(x = x/nearest, digits = digits))
+  }
+  else{
+    return(x)
+  }
+}
+```
+
+```{r read_data_intro, echo=FALSE, eval=TRUE, results='hide'}
+customer <- fread(input = "../Data/customer.csv")
+impressions <- fread(input = "../Data/impressions.csv")
+transactions <- fread(input = "../Data/transactions.csv")
+
+num.lines <- 20
+```
+
+```{r preprocessing_customer, echo=FALSE, comment=""}
+customer[,past.purchase := as.factor(past.purchase)]
+customer[,email := as.factor(email)]
+customer[,direct := as.factor(direct)]
+```
+
+```{r preprocessing_impressions, echo=FALSE, comment=""}
+impressions[,date := as.Date(date)]
+impressions[,channel := as.factor(channel)]
+impressions[,click := as.factor(click)]
+```
+
+```{r preprocessing_transactions, echo=FALSE, comment=""}
+transactions[,V1 := NULL]
+transactions[,date := as.Date(date)]
+transactions[,last.touch := as.factor(last.touch)]
+transactions[,last.click := as.factor(last.click)]
+```
+
+
+## Introduction
+
+- <font size="5">The goal of any marketing campaign is to increase sales, either in short-term or long-term, and each campaign or marketing channel should be evaluated based on the incremental profit, which is the additional sales we produce with advertising over what we would have sold without advertising, relative to its cost.</font> 
+
+- <font size="5">With the rapid development of digital media, we are able to track individual users’ behaviors, and it is beneficial for us to estimate **incremental sales** due to advertising in many different channels.</font> 
+
+- <font size="5">By using last-click attribution, experiments (holdout testing), marketing mix models and model-based attribution analysis, the main goal of this project is to **evaluate the effectiveness of different advertising channels**.</font> 
+
+
+## Description of the Dataset
+
+- The whole raw digital advertising dataset describes 10,000 customers as well as potential customers of a retailer, and the retailer uses four different advertising channels - display ads, social media ads, email ads, and direct mail ads. This dataset is a synthetic one simulated by the Elea McDonnell Feit, Marketing Professor of Drexel University, and is organized from three perspectives: customer, impressions, and transactions:
+
+ - <span style="color:dodgerblue">**customer.csv**</span>: each row in the file represents a customer, 10,000 rows 
+
+```{r customer}
+datatable(data = customer[1:num.lines,])
+```
+
+
+## Description of the Dataset
+
+ - <span style="color:dodgerblue">**Impressions.csv**</span>: each row is an exposure of marketing communication to a customer, 501,336 rows 
+ 
+```{r impressions}
+datatable(data = impressions[1:num.lines,])
+```
+
+
+## Description of the Dataset
+
+ - <span style="color:dodgerblue">**Transactions.csv**</span>: each row is a transaction made by a customer 
+ 
+```{r transactions}
+datatable(data = transactions[1:num.lines,])
+```
+
+
+## Method 1: Last-touch analysis
+
+ - <span style="color:dodgerblue">**Analysis**</span>: Based on last-touch attribution to find the last ad the user clicked on prior to the conversion so that we can get the sales attributed to each channel
+
+ - <span style="color:dodgerblue">**Implementation A**</span>: 
+```{r attribution.rules.table, echo=FALSE, comment=""}
+last.touch.tab <- xtabs(~last.touch, data = transactions)
+last.touch.tab
+```
+
+```{r attribution.rules.barplot, echo=FALSE, comment=""}
+tab <- transactions[,.N,by = last.touch]
+barplot <- barplot(height = tab[,N], space=0.01, las = 1, main = "Last Touch Attribution", ylab = "Transactions", xlab = "channel", ylim = c(0, 1.2*max(tab[,N], na.rm = TRUE)), col = "dodgerblue")
+
+text(barplot, par("usr")[3], labels = tab[,last.touch], srt = 45, adj = c(1.1,1.1), xpd = TRUE)
+
+space_val = 0
+text(x = -0.4 + 1:length(tab[,last.touch]) * (1+space_val), y = tab[,N], labels = tab[,N], pos = 3)
+```
+
+ - <span style="color:dodgerblue">**Implementation B**</span>: Shiny reporting engine: last touch analysis result for subgroups of transactions.
+
+ - <span style="color:dodgerblue">**Results & Interpretation**</span>: majority of conversions happen after receiving the ads through email, social media, and diplay.
+ 
+ 
+## Method 2: Holdout Test
+
+ - <span style="color:dodgerblue">**Analysis**</span>: Conduct an experiment called holdout testing by randomly selecting the customers for the control group to be not exposed to an ad. Here, we picked 2017-01-31 to analyze the result of the holdout test for the first 10 days. 
+
+ - <span style="color:dodgerblue">**Implementation A**</span>: 
+```{r holdout_test ttable, echo=FALSE, comment=""}
+test.date <- as.Date("2017-01-31")
+test.id <- impressions[date == test.date & channel == "email",.(id = unique(id))]
+test.id[,group := "test group"]
+hold.out.id <- impressions[date == test.date & channel == "email.holdout",.(id = unique(id))]
+hold.out.id[,group := "control group"]
+total.tab <- rbind(test.id,hold.out.id)
+total.tab[,group := as.factor(group)]
+duration <- 10
+trans.id <- transactions[date>=test.date & date<(test.date+duration),id]
+total.tab[,consumed := id %in% trans.id]
+
+ttable <- xtabs(~group + consumed, data = total.tab)
+ttable
+mosaicplot(~group + consumed, data = total.tab,color = TRUE,
+           main = paste("Holdout test on", test.date))
+```
+
+ - <span style="color:dodgerblue">**Results & Interpretation**</span>: Seen from the table as well as the plot, it is obvious that the proportion of people made actual consumption in test group who have received the email ads is **higher** than that in control group who didn't receive any email ads. 
+
+## Method 2: Holdout Test
+
+```{r holdout_test proptest, echo=FALSE, comment=""}
+proptest <- prop.test(x = ttable[,"TRUE"], n = xtabs(~group, data = total.tab))
+proptest
+diff.conv <- c(diff = (proptest$estimate[2]-proptest$estimate[1]), ci = -proptest$conf.int)
+diff.conv
+```
+
+ - <span style="color:dodgerblue">**Results & Interpretation**</span>: the test group had a **45.89%** conversion rate in the first 10 days after the email was sent, while the hold out group had a **40.1%** conversion rate. The incremental increase in conversion rate is between **+2.60%** and **+8.98%** (95% confidence interval).
+ 
+ - <span style="color:dodgerblue">**Implementation B**</span>: Shiny reporting engine: the ad response over time for different email holdout test and for different duration
+ 
+ 
+## Method 3: Marketing Mix Model (MMM)
+
+```{r Data.Prepration, echo=FALSE}
+# Data Preparation: summarize impressions and transactions by date
+trans.by.day <- xtabs(~date, transactions)
+data.chanel <- xtabs(~date+channel, impressions)
+mdata <- data.frame(cbind(Sales=trans.by.day[1:57], data.chanel[2:58,])) 
+
+# day of week
+mdata$dayofweek <- weekdays(as.Date(rownames(mdata)))
+
+# ad stock variable 
+mdata$Email.ad.effect <- as.numeric(filter(x=mdata$email, filter=0.5, method="recursive"))
+mdata$Display.ad.effect <- as.numeric(filter(x=mdata$display, filter=0.3, method="recursive"))
+mdata$Direct.ad.effect <- as.numeric(filter(x=mdata$direct, filter=0.75, method="recursive"))
+mdata$Social.ad.effect <- as.numeric(filter(x=mdata$social, filter=0.3, method="recursive"))
+
+# Interaction
+mdata$inter<-(mdata$Email.ad.effect)*(mdata$Social.ad.effect)
+
+# Beautiful
+colnames(mdata)<-c("Sales","Direct","Display","Email","Email Holdout","Social",
+                   "Day of Week",
+                   "Email ad effect","Display ad effect","Direct ad effect","Social ad effect",
+                   "Interaction")
+```
+
+ - <span style="color:dodgerblue">**Analysis**</span>: In order to investigate the correlations between total sales (trainsactions) and impression factors within a specific time period, we implemented linear regression model for marketing mix modeling.
+ 
+ Model 1: Basic regression
+ 
+ Model 2: Add in a day of week variable
+ 
+ Model 3: Taking the advertising effect into consideration
+ 
+ Model 4: Interactions between Email and Social factors
+ 
+ - <span style="color:dodgerblue">**Implementation：Let’s take a look at Model 3**</span>
+ 
+Account for the decay of advertising: An ad had its biggest **advertising effect** just after it is shown to the users and then the effect wears over the time. 
+
+```{r, echo=FALSE}
+par(mfrow=c(2,2))
+plot(mdata$`Email ad effect`, type="l", xlab="Time", ylab="Email")
+plot(mdata$`Display ad effect`, type="l", xlab="Time", ylab="Display")
+plot(mdata$`Direct ad effect`, type="l", xlab="Time", ylab="Direct")
+plot(mdata$`Social ad effect`, type="l", xlab="Time", ylab="Social")
+```
+
+
+## Method 3: Marketing Mix Model (MMM)
+
+```{r}
+model.3<-fit.model(dt=mdata[10:nrow(mdata),c(1,8:11)], "Sales", 
+                   input.names=c("Email ad effect","Display ad effect","Direct ad effect","Social ad effect"),
+                   model.type="linear", digits = 3)
+datatable(model.3)
+```
+
+ - <span style="color:dodgerblue">**Results & Interpretation: **</span>
+ 
+Positive effects for all forms of advertising.
+
+**Email** and **Direct** appears to have similar influence on sales at about 50 additional sales.
+
+All effects are statistically significant except for **Display**. **Display** still has a high standard error because there is not a big change after the adjustment. 
+
+
+## Method 4: Model-based Attribution Analysis
+
+```{r data_preparation, echo=FALSE}
+adatal <- as.data.frame(xtabs(~ id + date + channel, data=impressions), stringsAsFactors=FALSE)
+adatal$id <- as.integer(adatal$id)
+adatal$date <- as.Date(adatal$date)
+adatal$channel <- as.factor(adatal$channel)
+dimnames(adatal)[[2]][4] <- "impr"
+
+# Add in observations for users with no impressions
+pop <- unique(customer$id)
+no.impress.ids <- pop[!(pop %in% unique(impressions$id))]
+dates <- sort(unique(impressions$date))
+channels <- unique(impressions$channel)
+no.impress.obs <- data.frame(id=rep(no.impress.ids, each=length(dates)*length(channels)), 
+                             date=rep(rep(dates, each=length(channels)), length(no.impress.ids)), 
+                             channel=rep(channels, length(no.impress.ids)*length(dates)),
+                             impr=rep(0, length(dates)*length(no.impress.ids)*length(channels)), 
+                             stringsAsFactors=FALSE)
+no.impress.obs$channel <- as.factor(no.impress.obs$channel)
+adatal <- rbind(adatal, no.impress.obs)
+
+# Convert from long to wide format
+adata <- reshape(adatal, direction="wide", v.names="impr", idvar=c("id", "date"), 
+                timevar="channel", new.row.names=NULL)
+
+# Add transactions
+atrans <- as.data.frame(xtabs(~ id + date, data=transactions), stringsAsFactors=FALSE)
+atrans$id <- as.integer(atrans$id)
+atrans$date <- as.Date(atrans$date)
+dimnames(atrans)[[2]][3] <- "trans"
+adata <- merge(adata, atrans, by=c("id", "date"), all=TRUE)
+adata$trans[is.na(adata$trans)] <- 0 # Fill in zeros for transactions
+
+# Final tidy up
+# Remove first and last days (which are incomplete)
+adata <- adata[adata$date!="2016-12-31" & adata$date != "2017-02-28" & adata$date != "2017-02-27",]
+# Add customer info from cust table
+adata <- merge(adata, customer, by=c("id"))
+# Tidy up column names
+dimnames(adata)[[2]][3:11] <- c("direct", "display", "email", "email.holdout", "social", "trans", "past.purchase", "has.email", "has.direct")
+rm(adatal, atrans)
+```
+
+ - <span style="color:dodgerblue">**Analysis: **</span>Different from the MMM method, model-based attribution focuses on the **user level** by relating user transactions to prior advertising impressions. By visualizing this relationship as below, it is easy to see that users convert more on days they get emails or direct mails. 
+
+```{r plots, echo=FALSE}
+par(mfrow=c(2,2))
+plot(aggregate(trans~direct, data=adata, FUN=mean), type="h", ylim=c(0,0.15),
+     xlab="Impressions on Day", main="Direct Mail")
+plot(aggregate(trans~email, data=adata, FUN=mean), type="h", ylim=c(0,0.15),
+     xlab="Impressions on Day", main="Email")
+plot(aggregate(trans~display, data=adata, FUN=mean), type="h", ylim=c(0,0.15),
+     xlab="Impressions on Day", main="Display")
+plot(aggregate(trans~social, data=adata, FUN=mean), type="h", ylim=c(0,0.15),
+     xlab="Impressions on Day", main="Social Media")
+```
+
+## Method 4: Model-based Attribution Analysis
+
+ - <span style="color:dodgerblue">**Implementation:**</span>
+ 
+```{r fit_in_model}
+model.4<-fit.model(dt = adata, "trans", input.names=c("direct", "display","email", "social", "past.purchase"),
+                   model.type="logistic", digits = 3)
+datatable(model.4)
+```
+
+ - <span style="color:dodgerblue">**Results & Interpretation: **</span>
+
+From the summary, we could tell that **email** has the highest positive impact on the transaction - each email could increase 114% of probability for the transaction. The second highest channel is **direct mail** - each direct mail could increase 51% of probability for the transaction. Another notable fact is that the customers who have purchased before will significantly and positively impact the transactions - they are 160% more likely to purchase. 
+
+
+## Limitations and Uncertainties
+
+ - <span style="color:dodgerblue">**Simulated dataset**</span>: data is simulated but not real
+
+ - <span style="color:dodgerblue">**Other marketing channels**</span>: marketing channels in this case are limited
+
+ - <span style="color:dodgerblue">**Holdout test on Tuesday only**</span>: On 2017-01-03, 2017-01-17, 2017-01-24, 2017-01-31, 2017-02-07, 2017-02-14, and 2017-02-21, we conducted holdout test. But we cannot see if the result would be different on other days during a week.
+
+ - <span style="color:dodgerblue">**Small dataset**</span>:  After combing the data, the informative dataset is not large enough to reach solid conclusions. Additionally, as the daily display impressions in the simulated dataset are pretty much the same, the data is not that informative from this perspective.

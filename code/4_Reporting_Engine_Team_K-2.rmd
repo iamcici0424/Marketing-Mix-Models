@@ -1,0 +1,399 @@
+---
+title: "Advertising Response Measurement"
+output: flexdashboard::flex_dashboard
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo = TRUE, eval = TRUE, comment="", warning = FALSE, message = FALSE, tidy.opts=list(width.cutoff=55), tidy = TRUE)
+set.seed(123) # ensures repeatable results for attribution rules
+options(scipen=999) # suppress scientific notation
+```
+
+```{r libraries, echo=FALSE}
+library(prettydoc)
+library(data.table)
+library(Hmisc)
+library(scales)
+library(DT)
+library(lubridate)
+```
+
+```{r my_functions, echo=FALSE}
+fit.model <- function(dt, outcome.name, input.names, model.type, digits = 3){
+  the.formula <- reduce.formula(dt = dt, outcome.name = outcome.name, input.names = input.names)
+  
+  if(model.type == "logistic"){
+    mod <- glm(formula = the.formula, family = "binomial", data = dt)
+    mod.summary <- logistic.regression.summary(glm.mod = mod, digits = digits)
+  }
+  if(model.type == "linear"){
+    mod <- lm(formula = the.formula, data = dt)
+    mod.summary <- linear.regression.summary(lm.mod = mod, digits = digits)
+  }
+  mod.summary.rounded <- mod.summary[, lapply(X = .SD, FUN = "round.numerics", digits = digits)]
+  return(mod.summary.rounded)
+}
+
+
+logistic.regression.summary <- function(glm.mod, digits = 3){
+  library(data.table)
+  glm.coefs <- as.data.table(summary(glm.mod)$coefficients, keep.rownames = TRUE)
+  alpha = 0.05
+  z <- qnorm(p = 1-alpha/2, mean = 0, sd = 1)
+  glm.coefs[, Odds.Ratio := exp(Estimate)]
+  glm.coefs[, OR.Lower.95 := exp(Estimate - z * `Std. Error`)]
+  glm.coefs[, OR.Upper.95 := exp(Estimate + z * `Std. Error`)]
+  return(glm.coefs[])
+}
+
+
+linear.regression.summary <- function(lm.mod, digits = 3, alpha = 0.05) {
+  lm.coefs <- as.data.table(summary(lm.mod)$coefficients,keep.rownames = TRUE)
+  setnames(x = lm.coefs, old = "rn", new = "Variable")
+  z <- qnorm(p = 1 - alpha/2, mean = 0, sd = 1)
+  lm.coefs[, Coef.Lower.95 := Estimate - z * `Std. Error`]
+  lm.coefs[, Coef.Upper.95 := Estimate + z * `Std. Error`]
+  return(lm.coefs)
+}
+
+create.formula <- function(outcome.name, input.names, input.patterns = NA, all.data.names = NA, return.as = "character"){
+  
+  variable.names.from.patterns <- c()
+  if(!is.na(input.patterns[1]) & !is.na(all.data.names[1])){
+    pattern <- paste(input.patterns, collapse = "|")
+    variable.names.from.patterns <- all.data.names[grep(pattern = pattern, x = all.data.names)]
+  }
+  all.input.names <- unique(c(input.names, variable.names.from.patterns))
+  all.input.names <- all.input.names[all.input.names != outcome.name]
+  
+  if(!is.na(all.data.names[1])){
+    all.input.names <- all.input.names[all.input.names %in% all.data.names]
+  }
+
+  input.names.delineated <- sprintf("`%s`", all.input.names)
+  the.formula <- sprintf("`%s` ~ %s", outcome.name, paste(input.names.delineated, collapse = "+"))
+  
+  if(return.as == "formula"){
+    return(as.formula(the.formula))
+  }
+  if(return.as != "formula"){
+    return(the.formula)
+  }
+}
+
+reduce.formula <- function(dt, outcome.name, input.names, input.patterns = NA, max.input.categories = 20, max.outcome.categories.to.search = 4, return.as = "formula"){
+  require(data.table)
+  dt <- setDT(dt)
+  
+  if(!(outcome.name %in% names(dt))){
+    return("Error:  outcome.name is not in names(dt).")
+  }
+  
+  pattern.names <- list()
+  if(!is.na(input.patterns[1])){
+    for(i in 1:length(input.patterns)){
+      pattern.names[[i]] <- names(dt)[grep(pattern = input.patterns[i], x = names(dt))]
+    }
+  }
+  all.input.names <- c(input.names, as.character(pattern.names))
+  
+  num.outcome.categories <- dt[!is.na(get(outcome.name)), length(unique(get(outcome.name)))]
+  
+  if(num.outcome.categories <= max.outcome.categories.to.search){
+    num.unique.tab <- dt[, lapply(X = .SD, FUN = function(x){return(length(unique(x[!is.na(x)])))}), .SDcols = input.names, by = outcome.name]
+    min.categories.tab <- num.unique.tab[, lapply(X = .SD, FUN = "min"), .SDcols = input.names]
+    
+    reduced.inputs <- names(min.categories.tab)[min.categories.tab >= 2]
+  }
+  if(num.outcome.categories > max.outcome.categories.to.search){
+    reduced.inputs <- all.input.names
+  }
+  
+  the.formula <- create.formula(outcome.name = outcome.name, input.names = reduced.inputs, all.data.names = names(dt), input.patterns = NA, return.as = return.as)
+  return(the.formula)
+}
+round.numerics <- function(x, digits = 0, nearest = 1){
+  if(is.numeric(x)){
+    return(nearest * round(x = x/nearest, digits = digits))
+  }
+  else{
+    return(x)
+  }
+}
+```
+
+```{r read_data_intro, echo=FALSE, eval=TRUE, results='hide'}
+customer <- fread(input = "../Data/customer.csv")
+impressions <- fread(input = "../Data/impressions.csv")
+transactions <- fread(input = "../Data/transactions.csv")
+```
+
+```{r preprocessing_customer, echo=FALSE, comment=""}
+customer[,past.purchase := as.factor(past.purchase)]
+customer[,email := as.factor(email)]
+customer[,direct := as.factor(direct)]
+```
+
+```{r preprocessing_impressions, echo=FALSE, comment=""}
+impressions[,date := as.Date(date)]
+impressions[,channel := as.factor(channel)]
+impressions[,click := as.factor(click)]
+```
+
+```{r preprocessing_transactions, echo=FALSE, comment=""}
+transactions[,V1 := NULL]
+transactions[,date := as.Date(date)]
+transactions[,last.touch := as.factor(last.touch)]
+transactions[,last.click := as.factor(last.click)]
+```
+
+
+```{r constants, echo=FALSE, eval=TRUE, results='hide'}
+id.name = 'id'
+past.purchase.name = 'past.purchase'
+email.name = 'email'
+Email.name = 'Email'
+Email.Holdout.name = 'Email Holdout'
+direct.name = 'direct'
+Direct.name= 'Direct'
+Display.name = 'Display'
+Social.name = 'Social'
+date.name = 'date'
+channel.name = 'channel'
+click.name = 'click'
+last.touch.name = 'last.touch'
+last.click.name = 'last.click'
+Day.of.Week.name = 'Day of Week'
+Email.ad.effect.name = 'Email ad.effect'
+Display.ad.effect.name = 'Display ad.effect'
+Direct.ad.effect.name = 'Direct ad.effect'
+Social.ad.effect.name = 'Social ad.effect'
+
+unique.past.purchase.name = customer[,unique(get(past.purchase.name))]
+unique.email.name = customer[,unique(get(email.name))]
+unique.direct.name = customer[,unique(get(direct.name))]
+
+test.date.list = c('2017-01-03','2017-01-17', '2017-01-24', '2017-01-31', '2017-02-07', '2017-02-14', '2017-02-21')
+
+time.list = c('2017-01-01','2017-01-02','2017-01-03','2017-01-04','2017-01-05','2017-01-06','2017-01-07','2017-01-08','2017-01-09','2017-01-10','2017-01-11','2017-01-12','2017-01-13','2017-01-14','2017-01-15','2017-01-16','2017-01-17','2017-01-18','2017-01-19','2017-01-20','2017-01-21','2017-01-22','2017-01-23','2017-01-24','2017-01-25','2017-01-26','2017-01-27','2017-01-28','2017-01-29','2017-01-30','2017-01-31','2017-02-01','2017-02-02','2017-02-03','2017-02-04','2017-02-05','2017-02-06','2017-02-07','2017-02-08','2017-02-09','2017-02-10','2017-02-11','2017-02-12','2017-02-13','2017-02-14','2017-02-15','2017-02-16','2017-02-17','2017-02-18','2017-02-19','2017-02-20','2017-02-21','2017-02-22','2017-02-23','2017-02-24','2017-02-25','2017-02-26','2017-02-27','2017-02-28')
+```
+
+```{r Data.Prepration, echo=FALSE, eval=TRUE, results='hide'}
+# Data Preparation: summarize impressions and transactions by date
+trans.by.day <- xtabs(~date, transactions)
+data.chanel <- xtabs(~date+channel, impressions)
+mdata <- data.frame(cbind(Sales=trans.by.day[1:57], data.chanel[2:58,])) 
+
+# Day of week
+mdata$dayofweek <- weekdays(as.Date(rownames(mdata)))
+
+# Add Ad effect variable 
+mdata$Email.ad.effect <- as.numeric(filter(x=mdata$email, filter=0.5, method="recursive"))
+mdata$Display.ad.effect <- as.numeric(filter(x=mdata$display, filter=0.3, method="recursive"))
+mdata$Direct.ad.effect <- as.numeric(filter(x=mdata$direct, filter=0.75, method="recursive"))
+mdata$Social.ad.effect <- as.numeric(filter(x=mdata$social, filter=0.3, method="recursive"))
+
+# change variable names
+colnames(mdata)<-c("Sales","Direct","Display","Email","Email Holdout","Social","Day of Week","Email ad.effect","Display ad.effect","Direct ad.effect","Social ad.effect")
+
+# Add the weekday variable in the transactions and impressions tables so that we could inspect weekly patterns later
+transactions <- transactions[, eval(Day.of.Week.name) := weekdays(as.Date(date,'%d-%m-%Y'))]
+impressions <- impressions[, eval(Day.of.Week.name) := weekdays(as.Date(date,'%d-%m-%Y'))]
+```
+
+Exploratory Analysis
+===================================
+
+**Exploratory analysis upon the day of a week**
+
+Density plots to display the distributions of different variables over the week
+
+Row {data-height=100}
+-------------------------------------
+
+```{r EDA, echo=FALSE, eval=TRUE}
+weekday_variables = c(last.touch.name,last.click.name)
+
+inputPanel(
+  selectInput(inputId = "weekday_variables", label = "Select the variable", 
+              choices = weekday_variables, selected = weekday_variables[1])
+)
+
+renderPlot({
+  theme_set(theme_classic())
+  g <- ggplot(transactions, aes(get(Day.of.Week.name)))
+  g + geom_bar(aes(fill=get(input$weekday_variables)), width = 0.5) + labs(title="Density plot", subtitle=paste(input$weekday_variables,"distribution over the week")) + theme(axis.title.x = element_blank()) + scale_fill_discrete(name = "Channels")
+})
+```
+
+Last-touch for subgroups
+===================================
+
+**Last-touch analysis result for subgroups of transactions**
+
+Take a look at who our consumers are based on whether they have past purchase record and whether they can be reached out by email or direct mail.
+
+Row {data-height=500}
+-------------------------------------
+
+```{r Last-touch, echo=FALSE, eval=TRUE}
+inputPanel(
+  selectInput(inputId = "Last_touch_1", label = "Any past purchase record?", choices = unique.past.purchase.name, selected = unique.past.purchase.name[1]),
+  selectInput(inputId = "Last_touch_2", label = "If email marketing is available:", choices = unique.email.name, selected = unique.email.name[1]),
+  selectInput(inputId = "Last_touch_3", label = "If direct mail is available:", choices = unique.direct.name, selected = unique.direct.name[1]),
+  
+  checkboxInput(inputId = "Last_touch_4", label = "Sorted", value=TRUE),
+  checkboxInput(inputId = "Last_touch_5", label = "Show number", value = TRUE)
+)
+
+renderPlot({
+  selected.id.list = customer[get(past.purchase.name) == input$Last_touch_1 & get(email.name) == input$Last_touch_2 & get(direct.name) == input$Last_touch_3, id]
+  tab <- transactions[get(id.name) %in% selected.id.list,.N,by = last.touch]
+  
+  if(input$Last_touch_4 == TRUE){
+    setorderv(x = tab, cols = "N", order = -1)
+  }  
+  
+  barplot <- barplot(height = tab[,N], space=0.01, las = 1, main = "Last Touch Attribution", ylab = "Transactions", xlab = "channel", ylim = c(0, 1.2*max(tab[,N], na.rm = TRUE)), col = "dodgerblue")
+  text(barplot, par("usr")[3], labels = tab[,last.touch], srt = 45, adj = c(1.1,1.1), xpd = TRUE)
+  
+  if(input$Last_touch_5 == TRUE){
+  space_val = 0
+  text(x = -0.4 + 1:length(tab[,last.touch]) * (1+space_val), y = tab[,N], labels = tab[,N], pos = 3)
+
+  }
+})
+```
+
+Last-touch for different period
+===================================
+
+**Last-touch analysis result for different period of time**
+
+Take a look at different last-touch analysis result within different period of time.
+
+Row {data-height=500}
+-------------------------------------
+
+```{r Last-touch-1, echo=FALSE, eval=TRUE}
+inputPanel(
+  selectInput(inputId = "Last_touch_1_1", label = "The earliest time:", choices = time.list, selected = time.list[1]),
+  selectInput(inputId = "Last_touch_1_2", label = "The ending time:", choices = time.list, selected = time.list[-1]),
+  
+  checkboxInput(inputId = "Last_touch_1_3", label = "Sorted", value=TRUE),
+  checkboxInput(inputId = "Last_touch_1_4", label = "Show number", value = TRUE)
+)
+
+renderPlot({
+  tab <- transactions[date>=input$Last_touch_1_1 &date<=input$Last_touch_1_2,.N,by = last.touch]
+  
+  if(input$Last_touch_1_3 == TRUE){
+    setorderv(x = tab, cols = "N", order = -1)
+  }  
+  
+  barplot <- barplot(height = tab[,N], space=0.01, las = 1, main = "Last Touch Attribution", ylab = "Transactions", xlab = "channel", ylim = c(0, 1.2*max(tab[,N], na.rm = TRUE)), col = "dodgerblue")
+  text(barplot, par("usr")[3], labels = tab[,last.touch], srt = 45, adj = c(1.1,1.1), xpd = TRUE)
+  
+  if(input$Last_touch_1_4 == TRUE){
+  space_val = 0
+  text(x = -0.4 + 1:length(tab[,last.touch]) * (1+space_val), y = tab[,N], labels = tab[,N], pos = 3)
+
+  }
+})
+```
+
+Holdout Test
+===================================
+
+**Any difference about how much advertising increases sales**
+
+The ad response over time for different email holdout test and for different duration
+
+Row {data-height=500}
+-------------------------------------
+
+```{r hold-out test, echo=FALSE, eval=TRUE}
+inputPanel(
+  selectInput(inputId = "Holdout_test_1", label = "Select holdout test date:", choices = test.date.list, selected = test.date.list[1]),
+  sliderInput(inputId = "Holdout_test_2", label = "Select duration period:", min = 1, max = 20, value = 7, step = 1)
+)
+
+renderPlot({
+  test.date <- as.Date(input$Holdout_test_1)
+  test.id <- impressions[date == test.date & channel == "email",.(id = unique(id))]
+  test.id[,group := "test group"]
+  hold.out.id <- impressions[date == test.date & channel == "email.holdout",.(id = unique(id))]
+  hold.out.id[,group := "control group"]
+  total.tab <- rbind(test.id,hold.out.id)
+  total.tab[,group := as.factor(group)]
+  duration <- input$Holdout_test_2
+  trans.id <- transactions[date>=test.date & date<(test.date+duration),id]
+  total.tab[,converted := id %in% trans.id]
+  setnames(total.tab, old = "converted", new = "consumed")
+
+  ttable <- xtabs(~group + consumed, data = total.tab)
+  ttable
+  mosaicplot(~group + consumed, data = total.tab,color = TRUE,
+            main = paste("Holdout test on", test.date))
+})
+```
+
+Marketing mix model - Basic model
+===================================
+
+**Regression relating transactions to impressions**
+
+In order to investigate the correlations between total sales (trainsactions) and impression factors within a specific time period, we implemented linear regression model for marketing mix modeling.
+
+Row {data-height=500}
+-------------------------------------
+
+```{r Basic Regression, echo=FALSE, eval=TRUE}
+inputPanel(
+  selectInput(inputId = "Basic_Regression_1", label = "Select input variables:", choices = 
+c(Direct.name,Display.name,Email.name,Email.Holdout.name,Social.name,Day.of.Week.name), selected = c(Direct.name,Display.name,Email.name,Email.Holdout.name,Social.name,Day.of.Week.name), multiple = TRUE),
+  sliderInput(inputId="Basic_Regression_2", label = "Select Digits:", min = 0, max = 5, value = 3, step = 1)
+)
+
+renderDataTable({
+model<-fit.model(dt=mdata, outcome.name = "Sales", 
+                   input.names=input$Basic_Regression_1,
+                   model.type="linear", digits = input$Basic_Regression_2)
+datatable(model)
+})
+```
+
+Marketing mix model - Advanced model
+===================================
+
+**Account for the advertising effect and interactions between different impression factors**
+
+Account for the decay of advertising: An ad had its biggest advertising effect just after it is shown to the users and then the effect wears over time.
+
+Interactions occurs when there is an extra effect to have two advertising channels or impressions active meanwhile.
+
+Row {data-height=500}
+-------------------------------------
+
+```{r Advanced Regression, echo=FALSE, eval=TRUE}
+inputPanel(
+  selectInput(inputId = "Advanced_Regression_1", label = "Select input variables:", choices = 
+c(Email.ad.effect.name,Display.ad.effect.name,Direct.ad.effect.name,Social.ad.effect.name), selected = c(Email.ad.effect.name,Display.ad.effect.name,Direct.ad.effect.name,Social.ad.effect.name), multiple = TRUE),
+  selectInput(inputId = "Advanced_Regression_2", label = "Select interaction variable 1:", choices = c(Email.ad.effect.name,Display.ad.effect.name,Direct.ad.effect.name,Social.ad.effect.name), selected = Email.ad.effect.name),
+  selectInput(inputId = "Advanced_Regression_3", label = "Select interaction variable 2:", choices = c(Email.ad.effect.name,Display.ad.effect.name,Direct.ad.effect.name,Social.ad.effect.name), selected = Social.ad.effect.name),
+  sliderInput(inputId="Advanced_Regression_4", label = "Select Digits:", min = 0, max = 5, value = 3, step = 1)
+)
+
+renderDataTable({
+# Add Interaction
+mdata$inter = mdata[,get(input$Advanced_Regression_2) * get(input$Advanced_Regression_3)]
+setnames(mdata, old = 'inter', new = paste0(eval(input$Advanced_Regression_2),"*",eval(input$Advanced_Regression_3)))
+
+model<-fit.model(dt=mdata[10:nrow(mdata),], outcome.name = "Sales", 
+                   input.names=c(input$Advanced_Regression_1,paste0(eval(input$Advanced_Regression_2),"*",eval(input$Advanced_Regression_3))),
+                   model.type="linear", digits = input$Advanced_Regression_4)
+datatable(model)
+})
+```
