@@ -30,6 +30,6 @@
 
 ## Code
 
-* [Main Code](2_Final Report_Team_K-2.rmd)
+* [Main Code](2_Final_Report_Team_K-2.rmd)
 * [R Shiny App](4_Reporting_Engine_Team_K-2.rmd)
 * [Presentation Slides](6_Presentation_K_final-1.rmd)
