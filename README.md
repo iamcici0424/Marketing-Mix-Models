@@ -1,11 +1,10 @@
-# Marketing Mix/Multi-Touch Models: Advertising Response Measurement 
+## Marketing Mix/Multi-Touch Models: Advertising Response Measurement 
 
 **Time**: 12/2018 – 05/2019
 
 **Term** : Spring 2019
 
 **Group members**:
-
 
 + Chen(Cici) Chen cc4291@columbia.edu
 + Zichen(Zoe) Huang zh2380@columbia.edu
