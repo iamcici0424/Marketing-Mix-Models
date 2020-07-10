@@ -32,4 +32,10 @@ The main goal of this project is to evaluate the `effectiveness of different ad
 
 * [Main Code](code/2_Final_Report_Team_K-2.rmd)
 * [R Shiny App](code/4_Reporting_Engine_Team_K-2.rmd)
-* [Presentation Slides](code/6_Presentation_K_final-1.rmd)
+* [Codes for Presentation Slides](code/6_Presentation_K_final-1.rmd)
+
+## Reports
+*[HTML Final Report](doc/3_Final_Report_Team_K-2.html)
+*[Presentation Slides](doc/5_Presentation_K_final-1.html)
+
+
