@@ -35,7 +35,7 @@ The main goal of this project is to evaluate the `effectiveness of different ad
 * [Codes for Presentation Slides](code/6_Presentation_K_final-1.rmd)
 
 ## Reports
-*[HTML Final Report](doc/3_Final_Report_Team_K-2.html)
-*[Presentation Slides](doc/5_Presentation_K_final-1.html)
+* [HTML Final Report](doc/3_Final_Report_Team_K-2.html)
+* [Presentation Slides](doc/5_Presentation_K_final-1.html)
 
 
