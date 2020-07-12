@@ -1,7 +1,5 @@
 ## Marketing Mix/Multi-Touch Models: Advertising Response Measurement 
 
-**Time**: 12/2018 – 05/2019
-
 **Term** : Spring 2019
 
 **Group members**:
