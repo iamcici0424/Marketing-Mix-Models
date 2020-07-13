@@ -12,7 +12,14 @@
 
 The main goal of this project is to evaluate the `effectiveness of different advertising channels` from four different perspectives from *500,000+* data. Meanwhile, we would learn from the advantages and disadvantages of the approaches and gain a more comprehensive understanding of mix modeling methods for continuous study.
 
+Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
 
+```
+proj/
+├── data/
+├── code/
+└── doc/ Contains reports
+```
 ## Introduction
 
 * The ultimate goal of any marketing activities is to increase sales, either in `short-term` or `long-term`, and ideally each campaign or marketing channel should be evaluated based on the incremental profit, which is the additional sales we produce with advertising over what we would have sold without advertising, relative to its cost. 
