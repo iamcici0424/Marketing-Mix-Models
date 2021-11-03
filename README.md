@@ -43,5 +43,6 @@ proj/
 ## Reports
 * [HTML Final Report](doc/3_Final_Report_Team_K-2.html)
 * [HTML Presentation Slides](doc/5_Presentation_K_final-1.html)
+* [PDF Final Report](doc/PDF_Final_Report.pdf)
 
 
