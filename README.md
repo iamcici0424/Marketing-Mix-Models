@@ -1,6 +1,6 @@
 ## Marketing Mix/Multi-Touch Models: Advertising Response Measurement 
 
-**Term** : Spring 2019
+**School Term** : Spring 2019
 
 **Group members**:
 
@@ -29,15 +29,13 @@ proj/
 * Among diverse marketing activities, advertising is a major mean for branding and informing. Both online (`emails, social media, displays, etc.`) and offline (direct mails) advertisements play an indispensable role in marketing. As placing ads is expensive in terms of the cost of time, recourses, and budget, one most frequently asked question from the management team is that: how does my advertising work? With this question in mind, our team leveraged four methods to tackle the advertising effectiveness measurement problem: **last-click attribution analysis, holdout testing (experimentation), marketing mix models and model-based attribution analysis.** 
 
 ## Data
-
-The dataset we used for this project is a synthetic one simulated by the Elea McDonnell Feit, Marketing Professor of Drexel University, and is organized from three perspectives: customer, impressions, and transactions. Data generation method could be found [here](https://github.com/eleafeit/ad_response_tutorial/blob/master/R%20code/AdResponseDataGeneration.R)
+The dataset we used for this project is a synthetic one simulated by the **Elea McDonnell Feit**, Marketing Professor of Drexel University, and is organized from three perspectives: `customer`, `impressions`, and `transactions`. Data generation method could be found [here](https://github.com/eleafeit/ad_response_tutorial/blob/master/R%20code/AdResponseDataGeneration.R)
 
 * [Customer Dataset](data/customer.csv)
 * [Impressions](data/impressions.csv)
 * [Transactions](transactions.csv)
 
 ## Code
-
 * [Main Code](code/2_Final_Report_Team_K-2.rmd)
 * [R Shiny App](code/4_Reporting_Engine_Team_K-2.rmd)
 * [Codes for Presentation Slides](code/6_Presentation_K_final-1.rmd)
@@ -46,5 +44,3 @@ The dataset we used for this project is a synthetic one simulated by the Elea Mc
 * [HTML Final Report](doc/3_Final_Report_Team_K-2.html)
 * [HTML Presentation Slides](doc/5_Presentation_K_final-1.html)
 * [PDF Final Report](doc/PDF_Final_Report.pdf)
-
-
