@@ -30,6 +30,8 @@ proj/
 
 ## Data
 
+The dataset we used for this project is a synthetic one simulated by the Elea McDonnell Feit, Marketing Professor of Drexel University, and is organized from three perspectives: customer, impressions, and transactions. Data generation method could be found [here](https://github.com/eleafeit/ad_response_tutorial/blob/master/R%20code/AdResponseDataGeneration.R)
+
 * [Customer Dataset](data/customer.csv)
 * [Impressions](data/impressions.csv)
 * [Transactions](transactions.csv)
