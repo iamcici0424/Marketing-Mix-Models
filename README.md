@@ -29,7 +29,7 @@ proj/
 * Among diverse marketing activities, advertising is a major mean for branding and informing. Both online (`emails, social media, displays, etc.`) and offline (`direct mails`) advertisements play an indispensable role in marketing. As placing ads is expensive in terms of the cost of time, recourses, and budget, one most frequently asked question from the management team is that: how does my advertising work? With this question in mind, our team leveraged four methods to tackle the advertising effectiveness measurement problem: **last-click attribution analysis, holdout testing (experimentation), marketing mix models and model-based attribution analysis.** 
 
 ## Data
-The dataset we used for this project is a synthetic one simulated by the **Elea McDonnell Feit**, Marketing Professor of Drexel University, and is organized from three perspectives: `customer`, `impressions`, and `transactions`. Data generation method as well as our reference could be found [here](https://github.com/eleafeit/ad_response_tutorial/blob/master/R%20code/AdResponseDataGeneration.R)
+The dataset we used for this project is a synthetic one simulated by the **Elea McDonnell Feit**, Marketing Professor of Drexel University, and is organized from three perspectives: `customer`, `impressions`, and `transactions`. Data generation method and our inspiration reference could be found [here](https://github.com/eleafeit/ad_response_tutorial/blob/master/R%20code/AdResponseDataGeneration.R)
 
 * [Customer Dataset](data/customer.csv)
 * [Impressions](data/impressions.csv)
